@@ -94,6 +94,7 @@ int getIndex(int x, int y) {
 
 // --- Final das funções necessária para a manipulação da matriz de LEDs
 
+// Tarefa/função para o Joystick
 void vJoystickTask(void *params){
     adc_init();
     adc_gpio_init(joystick_X);
@@ -123,6 +124,7 @@ void vJoystickTask(void *params){
     }
 }
 
+// Tarefa/função para exibição no display OLED
 void vDisplayTask(void *params){
     // Inicialização dp Display I2C
     i2c_init(display_i2c_port, 400 * 1000); // Inicializa o I2C usando 400kHz
@@ -139,6 +141,7 @@ void vDisplayTask(void *params){
     bool modo_alerta;
     VolumeNivel_data_t VolNiv;
 
+    // Strings para volume e nivel
     char str_vol[3];
     char str_niv[3];
 
@@ -151,6 +154,7 @@ void vDisplayTask(void *params){
         ssd1306_draw_string(&ssd, "EMB Semaforo", 16, 3); // Desenha uma string
         ssd1306_draw_string(&ssd, "Modo:", 12, 15); // Desenha uma string
 
+        // Exibe informações de acordo com o modo
         if(xQueueReceive(xQueueEstacaoModo, &modo_alerta, portMAX_DELAY)){
             if(modo_alerta){
                 ssd1306_draw_string(&ssd, "Alerta", 60, 15); // Desenha uma string
@@ -160,12 +164,16 @@ void vDisplayTask(void *params){
                 ssd1306_draw_string(&ssd, "          ", 22, 51); // Desenha uma string
             }
         }
+
         ssd1306_draw_string(&ssd, "Vol. Chuva:   %", 4, 27); // Desenha uma string
         ssd1306_draw_string(&ssd, "Niv.  Agua:   %", 4, 38); // Desenha uma string
 
+        // Exibe os valores de volume e nivel
         if(xQueueReceive(xQueueVolumeNivel, &VolNiv, portMAX_DELAY)){
+
             sprintf(str_vol, "%.0f", VolNiv.volume_chuva); // Converte float em string
             sprintf(str_niv, "%.0f", VolNiv.nivel_agua); // Converte float em string
+
             if(VolNiv.volume_chuva > 99.5){
                 ssd1306_draw_string(&ssd, str_vol, 92, 27); // Desenha uma string
             }else if(VolNiv.volume_chuva > 9.9){
@@ -173,6 +181,7 @@ void vDisplayTask(void *params){
             }else{
                 ssd1306_draw_string(&ssd, str_vol, 108, 27); // Desenha uma string
             }
+
             if(VolNiv.nivel_agua > 99.5){
                 ssd1306_draw_string(&ssd, str_niv, 92, 38); // Desenha uma string
             }else if(VolNiv.nivel_agua > 9.9){
@@ -186,6 +195,7 @@ void vDisplayTask(void *params){
     }
 }
 
+// Tarefa/função para o LED RGB
 void vLEDTask(void *params){
     gpio_init(LED_Green); // Inicia a GPIO 11 do LED Verde
     gpio_set_dir(LED_Green, GPIO_OUT); // Define a direção da GPIO 11 do LED Verde como saída
@@ -209,6 +219,101 @@ void vLEDTask(void *params){
     }
 }
 
+// Tarfea/função para a matriz de LEDs
+void vMatrizTask(void *params){
+    // Inicialização do PIO
+    np_pio = pio0;
+    sm = pio_claim_unused_sm(np_pio, true);
+    uint offset = pio_add_program(pio0, &ws2818b_program);
+    ws2818b_program_init(np_pio, sm, offset, matriz_leds, 800000);
+    desliga(); // Para limpar o buffer dos LEDs
+    buffer(); // Atualiza a matriz de LEDs
+
+    bool modo_alerta;
+
+    while(true){
+        desliga();
+        while(true){
+        if(xQueueReceive(xQueueEstacaoModo, &modo_alerta, portMAX_DELAY)){
+            if(modo_alerta){
+                // Frame "!"
+                int frame0[5][5][3] = {
+                    {{0, 0, 0}, {0, 0, 0}, {150, 0, 0}, {0, 0, 0}, {0, 0, 0}},
+                    {{0, 0, 0}, {0, 0, 0}, {150, 0, 0}, {0, 0, 0}, {0, 0, 0}},    
+                    {{0, 0, 0}, {0, 0, 0}, {150, 0, 0}, {0, 0, 0}, {0, 0, 0}},
+                    {{0, 0, 0}, {0, 0, 0}, {0, 0, 0}, {0, 0, 0}, {0, 0, 0}},
+                    {{0, 0, 0}, {0, 0, 0}, {150, 0, 0}, {0, 0, 0}, {0, 0, 0}}
+                };
+                for (int linha = 0; linha < 5; linha++)
+                {
+                    for (int coluna = 0; coluna < 5; coluna++)
+                    {
+                    int posicao = getIndex(linha, coluna);
+                    cor(posicao, frame0[coluna][linha][0], frame0[coluna][linha][1], frame0[coluna][linha][2]);
+                    }
+                };
+                buffer();
+            }else{
+                // Frame "N"
+                int frame1[5][5][3] = {
+                    {{0, 150, 0}, {0, 0, 0}, {0, 0, 0}, {0, 0, 0}, {0, 150, 0}},
+                    {{0, 150, 0}, {0, 150, 0}, {0, 0, 0}, {0, 0, 0}, {0, 150, 0}},
+                    {{0, 150, 0}, {0, 0, 0}, {0, 150, 0}, {0, 0, 0}, {0, 150, 0}},
+                    {{0, 150, 0}, {0, 0, 0}, {0, 0, 0}, {0, 150, 0}, {0, 150, 0}},
+                    {{0, 150, 0}, {0, 0, 0}, {0, 0, 0}, {0, 0, 0}, {0, 150, 0}}
+                };
+                for (int linha = 0; linha < 5; linha++)
+                {
+                    for (int coluna = 0; coluna < 5; coluna++)
+                    {
+                    int posicao = getIndex(linha, coluna);
+                    cor(posicao, frame1[coluna][linha][0], frame1[coluna][linha][1], frame1[coluna][linha][2]);
+                    }
+                };
+                buffer();
+            }
+        }
+    }
+    }
+}
+
+// Tarefa/função para os buzzers
+void vBuzzerTask(void *params){
+    gpio_set_function(buzzer_A, GPIO_FUNC_PWM); // Define a função da porta GPIO como PWM
+    gpio_set_function(buzzer_B, GPIO_FUNC_PWM); // Define a função da porta GPIO como PWM
+
+    uint freq = 1000; // Frequência do buzzer
+    uint clock_div = 4; // Divisor do clock
+    uint wrap = (125000000 / (clock_div * freq)) - 1; // Define o valor do wrap para frequência escolhida
+
+    uint slice_A = pwm_gpio_to_slice_num(buzzer_A); // Define o slice do buzzer A
+    uint slice_B = pwm_gpio_to_slice_num(buzzer_B); // Define o slice do buzzer B
+
+    pwm_set_clkdiv(slice_A, clock_div); // Define o divisor do clock para o buzzer A
+    pwm_set_clkdiv(slice_B, clock_div); // Define o divisor do clock para o buzzer B
+    pwm_set_wrap(slice_A, wrap); // Define o valor do wrap para o buzzer A
+    pwm_set_wrap(slice_B, wrap); // Define o valor do wrap para o buzzer B
+    pwm_set_chan_level(slice_A, pwm_gpio_to_channel(buzzer_A), wrap / 40); // Duty cycle para definir o Volume do buzzer A
+    pwm_set_chan_level(slice_B, pwm_gpio_to_channel(buzzer_B), wrap / 40); // Duty cycle para definir o volume do buzzer B
+
+    bool modo_alerta;
+
+    while(true){
+        if(xQueueReceive(xQueueEstacaoModo, &modo_alerta, portMAX_DELAY)){
+            if(modo_alerta){
+                pwm_set_enabled(slice_A, true);
+                pwm_set_enabled(slice_B, true);
+                vTaskDelay(pdMS_TO_TICKS(100));
+                pwm_set_enabled(slice_A, false);
+                pwm_set_enabled(slice_B, false);
+                vTaskDelay(pdMS_TO_TICKS(100));
+            }else{
+                pwm_set_enabled(slice_A, false);
+                pwm_set_enabled(slice_B, false);
+            }
+        }
+    }
+}
 
 void gpio_irq_handler(uint gpio, uint32_t events){
     reset_usb_boot(0, 0);
@@ -223,7 +328,6 @@ int main()
     gpio_set_irq_enabled_with_callback(button_B, GPIO_IRQ_EDGE_FALL, true, &gpio_irq_handler);
 
     stdio_init_all();
-    sleep_ms(1000);
 
     // Cria a fila para compartilhamento de valor do joystick
     xQueueEstacaoModo = xQueueCreate(5, sizeof(bool));
@@ -233,6 +337,9 @@ int main()
     xTaskCreate(vJoystickTask, "Joystick", configMINIMAL_STACK_SIZE, NULL, 1, NULL);
     xTaskCreate(vDisplayTask, "Display", configMINIMAL_STACK_SIZE, NULL, 1, NULL);
     xTaskCreate(vLEDTask, "LED RGB", configMINIMAL_STACK_SIZE, NULL, 1, NULL);
+    xTaskCreate(vMatrizTask, "Matriz de LEDs", configMINIMAL_STACK_SIZE, NULL, 1, NULL);
+    xTaskCreate(vBuzzerTask, "Buzzer", configMINIMAL_STACK_SIZE, NULL, 1, NULL);
+
     // Inicia o agendador
     vTaskStartScheduler();
     panic_unsupported();
