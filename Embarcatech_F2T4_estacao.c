@@ -96,10 +96,12 @@ int getIndex(int x, int y) {
 
 // Tarefa/função para o Joystick
 void vJoystickTask(void *params){
+    // Inicialização do ADC
     adc_init();
     adc_gpio_init(joystick_X);
     adc_gpio_init(joystick_Y);
 
+    // Variáveis utilizadas nas filas
     bool modo_alerta = false;
     VolumeNivel_data_t VolNiv;
 
@@ -109,14 +111,18 @@ void vJoystickTask(void *params){
         adc_select_input(1); // Seleciona o ADC1 referente ao VRX do Joystick (GPIO 27)
         uint16_t value_vrx = adc_read(); // Ler o valor do ADC selecionado (ADC1 - VRX) e guarda
 
+        // Cálculos de volume de chuva e nível de água
         VolNiv.volume_chuva = (value_vry/4095.0) * 100.0;
         VolNiv.nivel_agua = (value_vrx/4095.0) * 100.0;
 
+        // Decisão se o modo alerta é ativado
         if((VolNiv.volume_chuva >= 80) || (VolNiv.nivel_agua >= 70)){
             modo_alerta = true;
         }else{
             modo_alerta = false;
         }
+
+        // Debug
         printf("Volume de chuva: %.1f | Nivel da agua: %.1f | Modo alerta: %d\n", VolNiv.volume_chuva, VolNiv.nivel_agua, modo_alerta);
         xQueueSend(xQueueEstacaoModo, &modo_alerta, 0); // Envia o valor para fila
         xQueueSend(xQueueVolumeNivel, &VolNiv, 0); // Envia o valor para fila
@@ -138,6 +144,7 @@ void vDisplayTask(void *params){
     ssd1306_fill(&ssd, false); // Limpa o display
     ssd1306_send_data(&ssd); // Atualiza o display
 
+    // Variáveis utilizadas nas filas
     bool modo_alerta;
     VolumeNivel_data_t VolNiv;
 
@@ -197,6 +204,7 @@ void vDisplayTask(void *params){
 
 // Tarefa/função para o LED RGB
 void vLEDTask(void *params){
+    // Inicialização dos LEDs
     gpio_init(LED_Green); // Inicia a GPIO 11 do LED Verde
     gpio_set_dir(LED_Green, GPIO_OUT); // Define a direção da GPIO 11 do LED Verde como saída
     gpio_put(LED_Green, false); // Estado inicial do LED apagado
@@ -204,9 +212,11 @@ void vLEDTask(void *params){
     gpio_set_dir(LED_Red, GPIO_OUT); // Define a direção da GPIO 13 do LED Vermelho como saída
     gpio_put(LED_Red, false); // Estado inicial do LED apagado
 
+    // Variável utilizada na fila
     bool modo_alerta;
 
     while(true){
+        // Recebe informação do modo da fila
         if(xQueueReceive(xQueueEstacaoModo, &modo_alerta, portMAX_DELAY)){
             if(modo_alerta){
                 gpio_put(LED_Green, false);
@@ -229,11 +239,12 @@ void vMatrizTask(void *params){
     desliga(); // Para limpar o buffer dos LEDs
     buffer(); // Atualiza a matriz de LEDs
 
+    // Variável utilizada na fila
     bool modo_alerta;
 
     while(true){
         desliga();
-        while(true){
+        // Recebe a informação do modo da fila
         if(xQueueReceive(xQueueEstacaoModo, &modo_alerta, portMAX_DELAY)){
             if(modo_alerta){
                 // Frame "!"
@@ -274,11 +285,12 @@ void vMatrizTask(void *params){
             }
         }
     }
-    }
 }
 
 // Tarefa/função para os buzzers
 void vBuzzerTask(void *params){
+
+    // Inicialização dos Buzzers PWM
     gpio_set_function(buzzer_A, GPIO_FUNC_PWM); // Define a função da porta GPIO como PWM
     gpio_set_function(buzzer_B, GPIO_FUNC_PWM); // Define a função da porta GPIO como PWM
 
@@ -296,9 +308,11 @@ void vBuzzerTask(void *params){
     pwm_set_chan_level(slice_A, pwm_gpio_to_channel(buzzer_A), wrap / 40); // Duty cycle para definir o Volume do buzzer A
     pwm_set_chan_level(slice_B, pwm_gpio_to_channel(buzzer_B), wrap / 40); // Duty cycle para definir o volume do buzzer B
 
+    // Variável utilizada na fila
     bool modo_alerta;
 
     while(true){
+        // Recebe a informaão do modo da fila
         if(xQueueReceive(xQueueEstacaoModo, &modo_alerta, portMAX_DELAY)){
             if(modo_alerta){
                 pwm_set_enabled(slice_A, true);
@@ -315,12 +329,13 @@ void vBuzzerTask(void *params){
     }
 }
 
+// Interrupção para o botão B para bootsel
 void gpio_irq_handler(uint gpio, uint32_t events){
     reset_usb_boot(0, 0);
 }
 
-int main()
-{
+// Função principal
+int main(){
     // Ativa BOOTSEL via botão
     gpio_init(button_B);
     gpio_set_dir(button_B, GPIO_IN);
