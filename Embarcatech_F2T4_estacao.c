@@ -158,7 +158,7 @@ void vDisplayTask(void *params){
         ssd1306_line(&ssd, 1, 24, 126, 24, true); // Desenha uma linha horizontal
 
         // Cabeçalho
-        ssd1306_draw_string(&ssd, "EMB Semaforo", 16, 3); // Desenha uma string
+        ssd1306_draw_string(&ssd, "EMB Estacao", 20, 3); // Desenha uma string
         ssd1306_draw_string(&ssd, "Modo:", 12, 15); // Desenha uma string
 
         // Exibe informações de acordo com o modo
